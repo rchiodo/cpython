@@ -2180,7 +2180,7 @@ AS_CASE([$ac_sys_system],
         AS_VAR_IF([ac_sys_emscripten_target], [node-debug], [wasm_debug=yes])
         AS_VAR_APPEND([LDFLAGS_NODIST], [" -sALLOW_MEMORY_GROWTH -sNODERAWFS"])
         AS_VAR_APPEND([LINKFORSHARED], [" -sEXIT_RUNTIME"])
-        WASM_LINKFORSHARED_DEBUG="-gseparate-dwarf --emit-symbol-map"
+        WASM_LINKFORSHARED_DEBUG="-gsource-map --emit-symbol-map"
       ]
     )
 

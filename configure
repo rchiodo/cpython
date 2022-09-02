@@ -8484,7 +8484,7 @@ fi
 fi
         as_fn_append LDFLAGS_NODIST " -sALLOW_MEMORY_GROWTH -sNODERAWFS"
         as_fn_append LINKFORSHARED " -sEXIT_RUNTIME"
-        WASM_LINKFORSHARED_DEBUG="-gseparate-dwarf --emit-symbol-map"
+        WASM_LINKFORSHARED_DEBUG="-gsource-map --emit-symbol-map --source-map-base \\\\wsl\$\\Ubuntu\\home\\rich\\source\\rchiodo-cpython\\builddir\\emscripten-node-dl-pthreads-debug"
 
      ;; #(
   *) :

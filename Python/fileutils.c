@@ -1990,16 +1990,27 @@ _Py_wrealpath(const wchar_t *path,
 int
 _Py_isabs(const wchar_t *path)
 {
-#ifdef MS_WINDOWS
+#ifdef MS_WINDOWS || __EMSCRIPTEN__
     const wchar_t *tail;
     HRESULT hr = PathCchSkipRoot(path, &tail);
     if (FAILED(hr) || path == tail) {
         return 0;
     }
+#ifdef MS_WINDOWS
     if (tail == &path[1] && (path[0] == SEP || path[0] == ALTSEP)) {
         // Exclude paths with leading SEP
         return 0;
     }
+#else
+    if (tail == &path[1] && (path[0] == L'\\')) {
+        // Exclude paths with leading backslash only
+        return 0;
+    }
+    if (path[0] == L'/') {
+        // Assume running on linux
+        return 1;
+    }
+#endif
     if (tail == &path[2] && path[1] == L':') {
         // Exclude drive-relative paths (e.g. C:filename.ext)
         return 0;
