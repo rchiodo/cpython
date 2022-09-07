@@ -78,14 +78,19 @@ os_stat(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwn
     if (!args) {
         goto exit;
     }
+    PySys_WriteStdout("Entering os_stat\n");
     if (!path_converter(args[0], &path)) {
+        PySys_WriteStderr("os_stat 3\n");
         goto exit;
+    } else {
+        PySys_WriteStdout("os_stat for %s\n", path.narrow);
     }
     if (!noptargs) {
         goto skip_optional_kwonly;
     }
     if (args[1]) {
         if (!FSTATAT_DIR_FD_CONVERTER(args[1], &dir_fd)) {
+        PySys_WriteStderr("os_stat 3\n");
             goto exit;
         }
         if (!--noptargs) {
@@ -94,9 +99,11 @@ os_stat(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwn
     }
     follow_symlinks = PyObject_IsTrue(args[2]);
     if (follow_symlinks < 0) {
+        PySys_WriteStderr("os_stat 3\n");
         goto exit;
     }
 skip_optional_kwonly:
+    PySys_WriteStdout("os_stat_impl call\n");
     return_value = os_stat_impl(module, &path, dir_fd, follow_symlinks);
 
 exit:
@@ -1719,13 +1726,13 @@ exit:
 
 #endif /* defined(MS_WINDOWS) */
 
-#if defined(MS_WINDOWS)
+#if defined(MS_WINDOWS) || defined(__EMSCRIPTEN__)
 
 PyDoc_STRVAR(os__path_splitroot__doc__,
 "_path_splitroot($module, /, path)\n"
 "--\n"
 "\n"
-"Removes everything after the root on Win32.");
+"Removes everything after the root on Win32 or Emscripten builds.");
 
 #define OS__PATH_SPLITROOT_METHODDEF    \
     {"_path_splitroot", _PyCFunction_CAST(os__path_splitroot), METH_FASTCALL|METH_KEYWORDS, os__path_splitroot__doc__},
@@ -1781,7 +1788,7 @@ exit:
     return return_value;
 }
 
-#endif /* defined(MS_WINDOWS) */
+#endif /* defined(MS_WINDOWS) || defined(__EMSCRIPTEN__) */
 
 PyDoc_STRVAR(os__path_normpath__doc__,
 "_path_normpath($module, /, path)\n"

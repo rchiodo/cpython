@@ -2460,6 +2460,7 @@ _pystat_fromstructstat(PyObject *module, STRUCT_STAT *st)
 #endif
 
     if (PyErr_Occurred()) {
+        PySys_WriteStderr("_pystat_fromstructstat error occurred.\n");
         Py_DECREF(v);
         return NULL;
     }
@@ -2476,6 +2477,7 @@ posix_do_stat(PyObject *module, const char *function_name, path_t *path,
 {
     STRUCT_STAT st;
     int result;
+    PySys_WriteStdout("posix_do_stat entering for %s\n", path->narrow);
 
 #ifdef HAVE_FSTATAT
     int fstatat_unavailable = 0;
@@ -2488,8 +2490,14 @@ posix_do_stat(PyObject *module, const char *function_name, path_t *path,
 
     if (path_and_dir_fd_invalid("stat", path, dir_fd) ||
         dir_fd_and_fd_invalid("stat", dir_fd, path->fd) ||
-        fd_and_follow_symlinks_invalid("stat", path->fd, follow_symlinks))
+        fd_and_follow_symlinks_invalid("stat", path->fd, follow_symlinks)) {
+        PySys_WriteStderr("posix_do_stat 1\n");
         return NULL;
+    }
+
+    if (path->fd != -1) {
+        PySys_WriteStdout("posix_do_stat using fstat\n");
+    }
 
     Py_BEGIN_ALLOW_THREADS
     if (path->fd != -1)
@@ -2523,14 +2531,36 @@ posix_do_stat(PyObject *module, const char *function_name, path_t *path,
 
 #ifdef HAVE_FSTATAT
     if (fstatat_unavailable) {
+        PySys_WriteStderr("posix_do_stat fstatat unavailable \n");
         argument_unavailable_error("stat", "dir_fd");
         return NULL;
     }
 #endif
 
     if (result != 0) {
+        PySys_WriteStderr("posix_do_stat result failed.\n");
         return path_error(path);
     }
+
+#ifdef __EMSCRIPTEN__
+    if (st.st_size == 0 && path->narrow && strchr(path->narrow, '/')) {
+        PySys_WriteStderr("posix_do_stat result = not found with forward slashes.\n");
+        // If we failed with forward slashes, try with backslashes
+        path_t backslash_path = { 0 };
+        memcpy(&backslash_path, path, sizeof(backslash_path));
+        backslash_path.narrow = PyMem_Malloc(strlen(path->narrow)+1);
+        strcpy(backslash_path.narrow, path->narrow);
+        char * pos = NULL;
+        while ((pos = strchr(backslash_path.narrow, '/'))) {
+            *pos = '\\';
+        }
+        PyObject * result = posix_do_stat(module, function_name, &backslash_path, dir_fd, follow_symlinks);
+        PyMem_Free(backslash_path.narrow);
+        return result;
+    } else if (st.st_size == 0) {
+        PySys_WriteStderr("posix_do_stat result is empty.\n");
+    }
+#endif
 
     return _pystat_fromstructstat(module, &st);
 }
@@ -4444,7 +4474,7 @@ os._path_splitroot
 
     path: path_t
 
-Removes everything after the root on Win32.
+Removes everything after the root on Win32 or Emscripten
 [clinic start generated code]*/
 
 static PyObject *
@@ -4484,8 +4514,52 @@ os__path_splitroot_impl(PyObject *module, path_t *path)
     return result;
 }
 
+#elif defined(__EMSCRIPTEN__) 
 
-#endif /* MS_WINDOWS */
+/*[clinic input]
+os._path_splitroot
+
+    path: path_t
+
+Removes everything after the root on Win32 or Emscripten
+[clinic start generated code]*/
+
+static PyObject *
+os__path_splitroot_impl(PyObject *module, path_t *path)
+/*[clinic end generated code: output=ab7f1a88b654581c input=dc93b1d3984cffb6]*/
+{
+    wchar_t *buffer;
+    wchar_t *end;
+    size_t len = mbstowcs(NULL, path->narrow, 0);
+    PyObject *result = NULL;
+    PySys_WriteStdout("Splitting root for %s\n", path->narrow);
+
+    buffer = (wchar_t*)PyMem_Malloc(sizeof(wchar_t) * (len + 1));
+    if (!buffer) {
+        return NULL;
+    }
+    mbstowcs(buffer, path->narrow, len + 1);
+    Py_BEGIN_ALLOW_THREADS
+    end = _Py_skiproot(buffer);
+    Py_END_ALLOW_THREADS
+    if (end == buffer) {
+        result = Py_BuildValue("Os", path->object, "");
+    } else if (end != buffer) {
+        size_t rootLen = (size_t)(end - buffer);
+        result = Py_BuildValue("NN",
+            PyUnicode_FromWideChar(buffer, rootLen),
+            PyUnicode_FromWideChar(buffer + rootLen, -1)
+        );
+    } else {
+        result = Py_BuildValue("Os", path->object, "");
+    }
+    PyMem_Free((void *)buffer);
+
+    return result;
+}
+
+
+#endif /* MS_WINDOWS elif __EMSCRIPTEN__ */
 
 
 /*[clinic input]

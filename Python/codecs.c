@@ -127,12 +127,14 @@ PyObject *normalizestring(const char *string)
 PyObject *_PyCodec_Lookup(const char *encoding)
 {
     if (encoding == NULL) {
+        PySys_WriteStderr( "_PyCode_Lookup 1\n");
         PyErr_BadArgument();
         return NULL;
     }
 
     PyInterpreterState *interp = _PyInterpreterState_GET();
     if (interp->codec_search_path == NULL && _PyCodecRegistry_Init()) {
+        PySys_WriteStderr( "_PyCode_Lookup 2\n");
         return NULL;
     }
 
@@ -141,6 +143,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
        replaced with underscores. */
     PyObject *v = normalizestring(encoding);
     if (v == NULL) {
+        PySys_WriteStderr( "_PyCode_Lookup 3\n");
         return NULL;
     }
     PyUnicode_InternInPlace(&v);
@@ -148,6 +151,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
     /* First, try to lookup the name in the registry dictionary */
     PyObject *result = PyDict_GetItemWithError(interp->codec_search_cache, v);
     if (result != NULL) {
+        PySys_WriteStderr( "_PyCode_Lookup 3\n");
         Py_INCREF(result);
         Py_DECREF(v);
         return result;
@@ -161,6 +165,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
     if (len < 0)
         goto onError;
     if (len == 0) {
+        PySys_WriteStderr( "_PyCode_Lookup 4\n");
         PyErr_SetString(PyExc_LookupError,
                         "no codec search functions registered: "
                         "can't find encoding");
@@ -172,16 +177,22 @@ PyObject *_PyCodec_Lookup(const char *encoding)
         PyObject *func;
 
         func = PyList_GetItem(interp->codec_search_path, i);
-        if (func == NULL)
+        if (func == NULL) {
+            PySys_WriteStderr( "_PyCode_Lookup 5\n");
             goto onError;
+        }
         result = PyObject_CallOneArg(func, v);
-        if (result == NULL)
+        if (result == NULL) {
+            PySys_WriteStderr( "_PyCode_Lookup 6\n");
             goto onError;
+        }
         if (result == Py_None) {
+            PySys_WriteStderr( "_PyCode_Lookup 7\n");
             Py_DECREF(result);
             continue;
         }
         if (!PyTuple_Check(result) || PyTuple_GET_SIZE(result) != 4) {
+            PySys_WriteStderr( "_PyCode_Lookup 8\n");
             PyErr_SetString(PyExc_TypeError,
                             "codec search functions must return 4-tuples");
             Py_DECREF(result);
@@ -190,6 +201,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
         break;
     }
     if (i == len) {
+        PySys_WriteStderr( "_PyCode_Lookup 9\n");
         /* XXX Perhaps we should cache misses too ? */
         PyErr_Format(PyExc_LookupError,
                      "unknown encoding: %s", encoding);
@@ -205,6 +217,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
     return result;
 
  onError:
+    PySys_WriteStderr( "_PyCode_Lookup Error\n");
     Py_DECREF(v);
     return NULL;
 }
@@ -1500,6 +1513,7 @@ static int _PyCodecRegistry_Init(void)
 
     interp->codec_search_path = PyList_New(0);
     if (interp->codec_search_path == NULL) {
+        PySys_WriteStderr( "Cannot allocate codec_search_path\n");
         return -1;
     }
 
@@ -1516,18 +1530,21 @@ static int _PyCodecRegistry_Init(void)
     for (size_t i = 0; i < Py_ARRAY_LENGTH(methods); ++i) {
         PyObject *func = PyCFunction_NewEx(&methods[i].def, NULL, NULL);
         if (!func) {
+            PySys_WriteStderr( "Cannot call method %s\n", methods[i].name);
             return -1;
         }
 
         int res = PyCodec_RegisterError(methods[i].name, func);
         Py_DECREF(func);
         if (res) {
+            PySys_WriteStderr( "Register error for method %s\n", methods[i].name);
             return -1;
         }
     }
 
     mod = PyImport_ImportModule("encodings");
     if (mod == NULL) {
+        PySys_WriteStderr( "Cannot import 'encodings'\n");
         return -1;
     }
     Py_DECREF(mod);

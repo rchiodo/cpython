@@ -14733,7 +14733,7 @@ _PyUnicode_ClearInterned(PyInterpreterState *interp)
        interned dict. */
 
 #ifdef INTERNED_STATS
-    fprintf(stderr, "releasing %zd interned strings\n",
+    PySys_WriteStderr("releasing %zd interned strings\n",
             PyDict_GET_SIZE(interned));
 
     Py_ssize_t total_length = 0;
@@ -14980,6 +14980,7 @@ config_get_codec_name(wchar_t **config_encoding)
 {
     char *encoding;
     if (encode_wstr_utf8(*config_encoding, &encoding, "stdio_encoding") < 0) {
+        PySys_WriteStderr("config_get_codec_name encoding stdio\n");
         return -1;
     }
 
@@ -14987,18 +14988,22 @@ config_get_codec_name(wchar_t **config_encoding)
     PyObject *codec = _PyCodec_Lookup(encoding);
     PyMem_RawFree(encoding);
 
-    if (!codec)
+    if (!codec) {
+        PySys_WriteStderr("config_get_codec_name not found during lookup\n");
         goto error;
+    }
 
     name_obj = PyObject_GetAttrString(codec, "name");
     Py_CLEAR(codec);
     if (!name_obj) {
+        PySys_WriteStderr("config_get_codec_name name not an attr\n");
         goto error;
     }
 
     wchar_t *wname = PyUnicode_AsWideCharString(name_obj, NULL);
     Py_DECREF(name_obj);
     if (wname == NULL) {
+        PySys_WriteStderr("config_get_codec_name name not convertable to a string\n");
         goto error;
     }
 
@@ -15044,6 +15049,7 @@ init_fs_codec(PyInterpreterState *interp)
     error_handler = get_error_handler_wide(config->filesystem_errors);
     if (error_handler == _Py_ERROR_UNKNOWN) {
         PyErr_SetString(PyExc_RuntimeError, "unknown filesystem error handler");
+        PySys_WriteStderr("init_fs_codec error_handler\n");
         return -1;
     }
 
@@ -15051,12 +15057,14 @@ init_fs_codec(PyInterpreterState *interp)
     if (encode_wstr_utf8(config->filesystem_encoding,
                          &encoding,
                          "filesystem_encoding") < 0) {
+        PySys_WriteStderr("init_fs_codec encoding\n");
         return -1;
     }
 
     if (encode_wstr_utf8(config->filesystem_errors,
                          &errors,
                          "filesystem_errors") < 0) {
+        PySys_WriteStderr("init_fs_codec encoding errors\n");
         PyMem_RawFree(encoding);
         return -1;
     }
@@ -15082,6 +15090,7 @@ init_fs_codec(PyInterpreterState *interp)
        global configuration variables. */
     if (_Py_SetFileSystemEncoding(fs_codec->encoding,
                                   fs_codec->errors) < 0) {
+        PySys_WriteStderr("init_fs_codec cannot set file system encoding\n");
         PyErr_NoMemory();
         return -1;
     }

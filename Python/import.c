@@ -1437,8 +1437,10 @@ PyImport_ImportModule(const char *name)
     PyObject *result;
 
     pname = PyUnicode_FromString(name);
-    if (pname == NULL)
+    if (pname == NULL) {
+        PySys_WriteStderr("%s is not convertable to unicode\n", pname);
         return NULL;
+    }
     result = PyImport_Import(pname);
     Py_DECREF(pname);
     return result;
@@ -1733,7 +1735,7 @@ import_find_and_load(PyThreadState *tstate, PyObject *abs_name)
         _PyTime_t cum = _PyTime_GetPerfCounter() - t1;
 
         import_level--;
-        fprintf(stderr, "import time: %9ld | %10ld | %*s%s\n",
+        PySys_WriteStderr( "import time: %9ld | %10ld | %*s%s\n",
                 (long)_PyTime_AsMicroseconds(cum - accumulated, _PyTime_ROUND_CEILING),
                 (long)_PyTime_AsMicroseconds(cum, _PyTime_ROUND_CEILING),
                 import_level*2, "", PyUnicode_AsUTF8(abs_name));
@@ -1980,14 +1982,17 @@ PyImport_Import(PyObject *module_name)
     if (globals != NULL) {
         Py_INCREF(globals);
         builtins = PyObject_GetItem(globals, &_Py_ID(__builtins__));
-        if (builtins == NULL)
+        if (builtins == NULL) {
+            PySys_WriteStderr("No builtins but have globals\n");
             goto err;
+        }
     }
     else {
         /* No globals -- use standard builtins, and fake globals */
         builtins = PyImport_ImportModuleLevel("builtins",
                                               NULL, NULL, NULL, 0);
         if (builtins == NULL) {
+            PySys_WriteStderr( "No builtins with fake globals\n");
             goto err;
         }
         globals = Py_BuildValue("{OO}", &_Py_ID(__builtins__), builtins);
@@ -2004,20 +2009,26 @@ PyImport_Import(PyObject *module_name)
     }
     else
         import = PyObject_GetAttr(builtins, &_Py_ID(__import__));
-    if (import == NULL)
+    if (import == NULL) {
+        PySys_WriteStderr( "Cannot find the import function on builtins\n");
         goto err;
+    }
 
     /* Call the __import__ function with the proper argument list
        Always use absolute import here.
        Calling for side-effect of import. */
+    PySys_WriteStderr( "Function call for import.\n");
     r = PyObject_CallFunction(import, "OOOOi", module_name, globals,
                               globals, from_list, 0, NULL);
-    if (r == NULL)
+    if (r == NULL) {
+        PySys_WriteStderr( "Function call failed when importing\n");
         goto err;
+    }
     Py_DECREF(r);
 
     r = import_get_module(tstate, module_name);
     if (r == NULL && !_PyErr_Occurred(tstate)) {
+        PySys_WriteStderr( "Getting the module failed on import\n");
         _PyErr_SetObject(tstate, PyExc_KeyError, module_name);
     }
 

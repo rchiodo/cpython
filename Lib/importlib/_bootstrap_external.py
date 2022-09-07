@@ -31,6 +31,7 @@ import marshal
 
 
 _MS_WINDOWS = (sys.platform == 'win32')
+_EMSCRIPTEN = (sys.platform == 'emscripten')
 if _MS_WINDOWS:
     import nt as _os
     import winreg
@@ -91,8 +92,7 @@ def _unpack_uint16(data):
     assert len(data) == 2
     return int.from_bytes(data, 'little')
 
-
-if _MS_WINDOWS:
+if _MS_WINDOWS or _EMSCRIPTEN:
     def _path_join(*path_parts):
         """Replacement for os.path.join()."""
         if not path_parts:
@@ -168,14 +168,13 @@ def _path_isdir(path):
     return _path_is_mode_type(path, 0o040000)
 
 
-if _MS_WINDOWS:
+if _MS_WINDOWS or _EMSCRIPTEN:
     def _path_isabs(path):
         """Replacement for os.path.isabs."""
         if not path:
             return False
         root = _os._path_splitroot(path)[0].replace('/', '\\')
         return len(root) > 1 and (root.startswith('\\\\') or root.endswith('\\'))
-
 else:
     def _path_isabs(path):
         """Replacement for os.path.isabs."""
@@ -1496,6 +1495,7 @@ class PathFinder:
 
         The search is based on sys.path_hooks and sys.path_importer_cache.
         """
+        _bootstrap._verbose_message(f"{str(cls)} get_spec for {fullname}")
         if path is None:
             path = sys.path
         spec = cls._get_spec(fullname, path, target)

@@ -1048,6 +1048,7 @@ def _find_spec_legacy(finder, name, path):
 
 
 def _find_spec(name, path, target=None):
+    _verbose_message(f"_find_spec called with {name}")
     """Find a module's spec."""
     meta_path = sys.meta_path
     if meta_path is None:
@@ -1065,6 +1066,7 @@ def _find_spec(name, path, target=None):
     for finder in meta_path:
         with _ImportLockContext():
             try:
+                _verbose_message(f"finder being tried: {str(finder)}")
                 find_spec = finder.find_spec
             except AttributeError:
                 spec = _find_spec_legacy(finder, name, path)

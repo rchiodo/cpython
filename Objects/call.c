@@ -5,6 +5,7 @@
 #include "pycore_pyerrors.h"      // _PyErr_Occurred()
 #include "pycore_pystate.h"       // _PyThreadState_GET()
 #include "pycore_tuple.h"         // _PyTuple_ITEMS()
+//#include "pycore_traceback.h"     // _Py_DumpTraceback()
 
 
 static PyObject *const *
@@ -50,6 +51,19 @@ _Py_CheckFunctionResult(PyThreadState *tstate, PyObject *callable,
             Py_FatalError("a function returned NULL without setting an exception");
 #endif
             return NULL;
+        } else {
+            // PySys_WriteStderr("Function returning NULL but exception is set \n");
+            // PyObject * tp, * v,* tb;
+            // PyErr_Fetch(&tp, &v, &tb);
+            // PyErr_NormalizeException(&tp, &v, &tb);
+            // PyObject * cls_str = PyObject_Str(v);
+            // Py_ssize_t len = 0;
+            // const wchar_t * trace = PyUnicode_AsWideCharString(cls_str, &len);
+            // PySys_WriteStderr("Function exception value %S\n", trace);
+            // PyMem_Free((void*)trace);
+            // PyErr_Restore(tp, v, tb);
+            // PySys_WriteStderr("Function exception trace:\n");
+            // _Py_DumpTraceback(STDERR_FILENO , tstate);
         }
     }
     else {
@@ -188,6 +202,7 @@ _PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
 
     PyObject *argstuple = _PyTuple_FromArray(args, nargs);
     if (argstuple == NULL) {
+        fprintf(stderr,"_PyObjectMake_TpCall 1\n");
         return NULL;
     }
 
@@ -201,6 +216,7 @@ _PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
             kwdict = _PyStack_AsDict(args + nargs, keywords);
             if (kwdict == NULL) {
                 Py_DECREF(argstuple);
+                fprintf(stderr,"_PyObjectMake_TpCall 2\n");
                 return NULL;
             }
         }
@@ -505,10 +521,12 @@ _PyObject_CallFunctionVa(PyThreadState *tstate, PyObject *callable,
     PyObject *result;
 
     if (callable == NULL) {
+        PySys_WriteStderr("CallFunctionVA 1\n");
         return null_error(tstate);
     }
 
     if (!format || !*format) {
+        PySys_WriteStderr("CallFunctionVA 2\n");
         return _PyObject_CallNoArgsTstate(tstate, callable);
     }
 
@@ -521,6 +539,7 @@ _PyObject_CallFunctionVa(PyThreadState *tstate, PyObject *callable,
                                  format, va, &nargs);
     }
     if (stack == NULL) {
+        PySys_WriteStderr("CallFunctionVA 3\n");
         return NULL;
     }
     EVAL_CALL_STAT_INC_IF_FUNCTION(EVAL_CALL_API, callable);
