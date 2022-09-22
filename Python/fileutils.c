@@ -1986,31 +1986,85 @@ _Py_wrealpath(const wchar_t *path,
 }
 #endif
 
+const wchar_t * _Py_skiproot(const wchar_t * path) {
+#ifdef __EMSCRIPTEN__
+    if (path == NULL || path[0] == 0) {
+        return path;
+    }
+    size_t len = wcslen(path);
+    size_t offset = 0;
+    int is_unc = 0;
+
+    // Used this as a reference https://docs.microsoft.com/en-us/dotnet/standard/io/file-path-formats
+    // Windows paths can be used in emscripten, but they'll all be slash switched.
+    // \\?\ case
+    if (len >= 3 && wcsncmp(path, L"//?", 3) == 0) {
+        offset = 3;
+        is_unc = 1;
+    }
+    // \\.\\ case
+    if (len >= 3 && wcsncmp(path, L"//.", 3) == 0) {
+        offset = 3;
+        is_unc = 1;
+    }
+    // \\<network mount> case
+    if (len >= 2 && wcsncmp(path, L"//", 2) == 0) {
+        offset = 2;
+        is_unc = 1;
+    }
+
+    // If UNC, skip past the share and the drive
+    if (is_unc && offset > 0) {
+        wchar_t * pos = path + offset;
+        int forwardslash_count = 0;
+        while (*pos && forwardslash_count < 2) {
+            if (*pos == L"/") {
+                forwardslash_count += 1;
+            }
+        }
+        if (forwardslash_count == 2) {
+            return pos;
+        }
+    } else if (len >= 3 && wcsncmp(&path[1], L":/", 2) == 0) {
+        // Not UNC, should just be a drive letter
+        return &path[3];
+    }
+    return path;
+#else 
+    return path;
+#endif
+}
 
 int
 _Py_isabs(const wchar_t *path)
 {
-#ifdef MS_WINDOWS || __EMSCRIPTEN__
+#ifdef MS_WINDOWS
     const wchar_t *tail;
     HRESULT hr = PathCchSkipRoot(path, &tail);
     if (FAILED(hr) || path == tail) {
         return 0;
     }
-#ifdef MS_WINDOWS
     if (tail == &path[1] && (path[0] == SEP || path[0] == ALTSEP)) {
         // Exclude paths with leading SEP
         return 0;
     }
-#else
-    if (tail == &path[1] && (path[0] == L'\\')) {
-        // Exclude paths with leading backslash only
+    if (tail == &path[2] && path[1] == L':') {
+        // Exclude drive-relative paths (e.g. C:filename.ext)
         return 0;
     }
-    if (path[0] == L'/') {
+#elif defined(__EMSCRIPTEN__)
+    if (path[0] == L'/' && path[1] != L'/') {
         // Assume running on linux
         return 1;
     }
-#endif
+    const wchar_t *tail = _Py_skiproot(path);
+    if (tail == path) {
+        return 0;
+    }
+    if (tail == &path[1] && (path[0] == L'/')) {
+        // Exclude paths with leading forward slash
+        return 0;
+    }
     if (tail == &path[2] && path[1] == L':') {
         // Exclude drive-relative paths (e.g. C:filename.ext)
         return 0;
@@ -2315,8 +2369,9 @@ _Py_wgetcwd(wchar_t *buf, size_t buflen)
     wchar_t *wname;
     size_t len;
 
-    if (getcwd(fname, Py_ARRAY_LENGTH(fname)) == NULL)
+    if (getcwd(fname, Py_ARRAY_LENGTH(fname)) == NULL) {
         return NULL;
+    }
     wname = Py_DecodeLocale(fname, &len);
     if (wname == NULL)
         return NULL;

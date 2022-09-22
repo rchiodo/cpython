@@ -235,6 +235,8 @@ extern int _Py_EncodeNonUnicodeWchar_InPlace(
 
 extern int _Py_isabs(const wchar_t *path);
 extern int _Py_abspath(const wchar_t *path, wchar_t **abspath_p);
+PyAPI_FUNC(const wchar_t*) _Py_skiproot(const wchar_t * path);
+
 #ifdef MS_WINDOWS
 extern int _PyOS_getfullpathname(const wchar_t *path, wchar_t **abspath_p);
 #endif

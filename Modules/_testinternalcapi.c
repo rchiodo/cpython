@@ -15,7 +15,7 @@
 #include "pycore_atomic_funcs.h" // _Py_atomic_int_get()
 #include "pycore_bitutils.h"     // _Py_bswap32()
 #include "pycore_compile.h"      // _PyCompile_OptimizeCfg()
-#include "pycore_fileutils.h"    // _Py_normpath
+#include "pycore_fileutils.h"    // _Py_normpath, _Py_skiproot
 #include "pycore_frame.h"        // _PyInterpreterFrame
 #include "pycore_gc.h"           // PyGC_Head
 #include "pycore_hashtable.h"    // _Py_hashtable_new()
@@ -551,6 +551,35 @@ _testinternalcapi_optimize_cfg_impl(PyObject *module, PyObject *instructions,
     return _PyCompile_OptimizeCfg(instructions, consts);
 }
 
+static PyObject *
+test_py_skiproot(PyObject *self, PyObject *Py_UNUSED(args)) {
+#ifdef __EMSCRIPTEN__ // Only used in EMSCRIPTEN builds
+    #define CHECK(path, expected_tail) do {              \
+        const wchar_t * tail = _Py_skiproot(path); \
+        if (expected_tail != NULL && tail == NULL) \
+            return NULL; \
+        if (expected_tail == NULL && tail != NULL) \
+            return NULL; \
+        if (wcscmp(expected_tail, tail) != 0) \
+            return NULL; \
+    } while (0)                              \
+
+    CHECK(L"//?/C$/path", L"path");
+    CHECK(L"X:/path", L"path");
+    CHECK(NULL, NULL);
+    CHECK(L"//./C:/Test/Foo.txt", L"Test/Foo.txt");
+    CHECK(L"//./Volume{b75e2c83-0000-0000-0000-602f00000000}/Test/Foo.txt", L"Test/Foo.txt");
+    CHECK(L"//./UNC/Server/Share/Test/Foo.txt", L"Test/Foo.txt");
+    CHECK(L"Test/Foo.txt", L"Test/Foo.txt");
+    CHECK(L"Test", L"Test");
+    CHECK(L"../..", L"../..");
+
+    #undef CHECK
+#endif
+    Py_RETURN_NONE;
+}
+
+
 
 static PyMethodDef TestMethods[] = {
     {"get_configs", get_configs, METH_NOARGS},
@@ -570,6 +599,7 @@ static PyMethodDef TestMethods[] = {
     {"DecodeLocaleEx", decode_locale_ex, METH_VARARGS},
     {"set_eval_frame_default", set_eval_frame_default, METH_NOARGS, NULL},
     {"set_eval_frame_record", set_eval_frame_record, METH_O, NULL},
+    {"test_py_skiproot", test_py_skiproot, METH_NOARGS},
     _TESTINTERNALCAPI_OPTIMIZE_CFG_METHODDEF
     {NULL, NULL} /* sentinel */
 };
